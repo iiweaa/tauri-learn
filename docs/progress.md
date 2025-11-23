@@ -43,20 +43,25 @@
 - **功能**：计算器应用（支持四则运算和错误处理）
 
 ### 文档文件
-- **课程讲义**：`docs/lessons/lesson-01-tauri-introduction.md`
-- **作业文档**：`docs/homework/homework-01.md`
-- **学习笔记**：`docs/notes/notes-01-environment-setup.md`
+- **第1课讲义**：`docs/lessons/lesson-01-tauri-introduction.md`
+- **第1课语法指南**：`docs/lessons/syntax-guide-01.md`（适合C语言开发者）
+- **第1课作业**：`docs/homework/homework-01.md`
+- **第1课笔记**：`docs/notes/notes-01-environment-setup.md`
+- **第2课讲义**：`docs/lessons/lesson-02-project-structure.md` ✅
+- **第2课作业**：`docs/homework/homework-02.md` ✅
 - **README**：`README.md`
 
 ## 下一步计划
 
-### 明天开始：第2课
+### 当前课程：第2课
 - **课程标题**：项目结构解析与基础配置
+- **学习状态**：📖 讲义已就绪，可以开始学习
 - **学习目标**：
   - 详细解析TAURI项目的各个目录和文件
   - 深入理解 `tauri.conf.json` 配置项
-  - 学习如何配置应用权限和安全策略
+  - 学习如何配置应用权限和安全策略（Capabilities）
   - 掌握构建配置和打包选项
+  - 理解Cargo.toml和package.json的作用
 
 ## 学习心得
 
@@ -80,5 +85,6 @@
 ---
 
 **最后更新**：2025年11月15日
-**下次学习**：2025年11月16日 - 第2课
+**当前学习**：第2课 - 项目结构解析与基础配置
+**讲义状态**：✅ 已就绪，可以开始学习
 

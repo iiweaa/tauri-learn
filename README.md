@@ -45,7 +45,7 @@ Tauri/
 
 ### 第一阶段：基础入门（第1-3课）
 - ✅ 第1课：TAURI框架简介与环境搭建
-- 第2课：项目结构解析与基础配置
+- 📖 第2课：项目结构解析与基础配置（讲义已就绪）
 - 第3课：前端与后端的通信机制
 
 ### 第二阶段：核心功能（第4-7课）
@@ -122,14 +122,14 @@ Tauri/
 所有课程讲义存放在 `docs/lessons/` 目录下，按照课程编号命名：
 - `lesson-01-tauri-introduction.md` - 第1课
 - `syntax-guide-01.md` - 第1课语法详解（零基础入门指南）
-- `lesson-02-project-structure.md` - 第2课（待添加）
+- `lesson-02-project-structure.md` - 第2课
 - ...
 
 ### 查看作业要求
 
 作业文档存放在 `docs/homework/` 目录下：
 - `homework-01.md` - 第1课作业
-- `homework-02.md` - 第2课作业（待添加）
+- `homework-02.md` - 第2课作业
 - ...
 
 ### 运行实践项目
