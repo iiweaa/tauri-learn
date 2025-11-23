@@ -121,6 +121,7 @@ Tauri/
 
 所有课程讲义存放在 `docs/lessons/` 目录下，按照课程编号命名：
 - `lesson-01-tauri-introduction.md` - 第1课
+- `syntax-guide-01.md` - 第1课语法详解（零基础入门指南）
 - `lesson-02-project-structure.md` - 第2课（待添加）
 - ...
 
