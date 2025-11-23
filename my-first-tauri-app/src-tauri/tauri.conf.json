@@ -13,12 +13,24 @@
     "windows": [
       {
         "label": "main",
-        "title": "我的学习应用",
+        "title": "主窗口",
         "width": 1200,
         "height": 800,
         "minWidth": 500,
         "minHeight": 400,
-        "center": true
+        "center": true,
+        "closable": true
+      },
+      {
+        "label": "secondary",
+        "title": "辅助窗口",
+        "width": 800,
+        "height": 600,
+        "minWidth": 400,
+        "minHeight": 300,
+        "center": true,
+        "visible": false,
+        "closable": true
       }
     ],
     "security": {

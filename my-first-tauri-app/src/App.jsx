@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow, Window, LogicalSize } from "@tauri-apps/api/window";
 import "./App.css";
 
 function App() {
@@ -30,6 +31,11 @@ function App() {
   const [divideB, setDivideB] = useState("");
   const [divideResult, setDivideResult] = useState("");
   const [divideError, setDivideError] = useState("");
+  
+  // 窗口控制相关状态
+  const [windowTitle, setWindowTitle] = useState("主窗口");
+  const [windowSize, setWindowSize] = useState("1200x800");
+  const [isSecondaryVisible, setIsSecondaryVisible] = useState(false);
 
   async function greet() {
     // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -172,6 +178,138 @@ function App() {
       setDivideResult("");
     }
   }
+
+  // 窗口控制函数
+  // 显示/隐藏辅助窗口
+  async function toggleSecondaryWindow() {
+    try {
+      console.log("尝试获取辅助窗口...");
+      
+      // TAURI 2.0: 使用Window.getByLabel或Window.getAll
+      let secondaryWindow = null;
+      
+      try {
+        // 尝试使用getByLabel（需要await，因为它返回Promise）
+        if (typeof Window.getByLabel === "function") {
+          secondaryWindow = await Window.getByLabel("secondary");
+          console.log("使用getByLabel获取窗口:", secondaryWindow);
+        }
+      } catch (e) {
+        console.log("getByLabel失败:", e.message);
+      }
+      
+      // 如果getByLabel失败，尝试使用getAll
+      if (!secondaryWindow) {
+        try {
+          if (typeof Window.getAll === "function") {
+            const allWindows = await Window.getAll();
+            console.log("所有窗口:", allWindows);
+            secondaryWindow = allWindows.find(w => w.label === "secondary");
+            console.log("从getAll中找到的窗口:", secondaryWindow);
+          }
+        } catch (e) {
+          console.log("getAll失败:", e.message);
+        }
+      }
+      
+      if (!secondaryWindow) {
+        console.error("无法获取辅助窗口");
+        alert("无法获取辅助窗口。请检查：\n1. 窗口是否在配置文件中定义\n2. 权限是否正确配置\n3. 查看浏览器控制台的详细错误");
+        return;
+      }
+      
+      console.log("辅助窗口对象:", secondaryWindow);
+      const isVisible = await secondaryWindow.isVisible();
+      console.log("辅助窗口是否可见:", isVisible);
+      
+      if (isVisible) {
+        console.log("隐藏辅助窗口...");
+        await secondaryWindow.hide();
+        console.log("辅助窗口已隐藏");
+        setIsSecondaryVisible(false);
+      } else {
+        console.log("显示辅助窗口...");
+        await secondaryWindow.show();
+        console.log("辅助窗口已显示");
+        setIsSecondaryVisible(true);
+      }
+    } catch (err) {
+      console.error("控制辅助窗口失败:", err);
+      console.error("错误详情:", err.message, err.stack);
+      alert(`控制辅助窗口失败: ${err.message || err}`);
+    }
+  }
+
+  // 设置主窗口标题
+  async function setMainWindowTitle() {
+    try {
+      const mainWindow = getCurrentWindow();
+      await mainWindow.setTitle(windowTitle);
+    } catch (err) {
+      console.error("设置窗口标题失败:", err);
+    }
+  }
+
+  // 设置主窗口大小
+  async function setMainWindowSize(size) {
+    try {
+      console.log("设置窗口大小:", size);
+      const mainWindow = getCurrentWindow();
+      const [width, height] = size.split("x").map(Number);
+      console.log("宽度:", width, "高度:", height);
+      
+      // TAURI 2.0使用LogicalSize类型
+      await mainWindow.setSize(new LogicalSize(width, height));
+      setWindowSize(size);
+      console.log("窗口大小设置成功");
+    } catch (err) {
+      console.error("设置窗口大小失败:", err);
+      alert(`设置窗口大小失败: ${err}`);
+    }
+  }
+
+  // 居中主窗口
+  async function centerMainWindow() {
+    try {
+      console.log("居中窗口...");
+      const mainWindow = getCurrentWindow();
+      await mainWindow.center();
+      console.log("窗口已居中");
+    } catch (err) {
+      console.error("居中窗口失败:", err);
+      alert(`居中窗口失败: ${err}`);
+    }
+  }
+
+  // 监听窗口事件
+  useEffect(() => {
+    const setupWindowListeners = async () => {
+      try {
+        const mainWindow = getCurrentWindow();
+        
+        // 监听窗口关闭事件
+        await mainWindow.onCloseRequested((event) => {
+          console.log("窗口即将关闭");
+          // 不调用 event.preventDefault()，允许窗口正常关闭
+        });
+        
+        // 监听窗口大小改变
+        await mainWindow.onResized((size) => {
+          console.log("窗口大小改变:", size);
+          setWindowSize(`${size.width}x${size.height}`);
+        });
+        
+        // 监听窗口焦点
+        await mainWindow.onFocusChanged((focused) => {
+          console.log("窗口焦点状态:", focused);
+        });
+      } catch (err) {
+        console.error("设置窗口监听器失败:", err);
+      }
+    };
+    
+    setupWindowListeners();
+  }, []);
 
   return (
     <main className="container">
@@ -346,6 +484,57 @@ function App() {
             {divideResult}
           </p>
         )}
+      </div>
+
+      {/* 窗口管理部分 */}
+      <div className="calculator-section">
+        <h2>窗口管理</h2>
+        
+        {/* 辅助窗口控制 */}
+        <div className="row" style={{ marginBottom: "1rem" }}>
+          <button type="button" onClick={toggleSecondaryWindow}>
+            显示/隐藏辅助窗口
+          </button>
+        </div>
+        
+        {/* 主窗口标题控制 */}
+        <div className="row" style={{ marginBottom: "1rem" }}>
+          <input
+            type="text"
+            value={windowTitle}
+            onChange={(e) => setWindowTitle(e.target.value)}
+            placeholder="输入窗口标题"
+            style={{ minWidth: "200px" }}
+          />
+          <button type="button" onClick={setMainWindowTitle}>
+            设置窗口标题
+          </button>
+        </div>
+        
+        {/* 主窗口大小控制 */}
+        <div className="row" style={{ marginBottom: "1rem" }}>
+          <button type="button" onClick={() => setMainWindowSize("1000x700")}>
+            设置大小：1000x700
+          </button>
+          <button type="button" onClick={() => setMainWindowSize("1200x800")}>
+            设置大小：1200x800
+          </button>
+          <button type="button" onClick={() => setMainWindowSize("800x600")}>
+            设置大小：800x600
+          </button>
+        </div>
+        
+        {/* 窗口居中 */}
+        <div className="row">
+          <button type="button" onClick={centerMainWindow}>
+            居中窗口
+          </button>
+        </div>
+        
+        {/* 当前窗口信息 */}
+        <p style={{ marginTop: "1rem", fontSize: "0.9em", color: "#666" }}>
+          当前窗口大小：{windowSize}
+        </p>
       </div>
     </main>
   );
