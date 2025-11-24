@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, Window, LogicalSize } from "@tauri-apps/api/window";
+import { readTextFile, writeTextFile, readDir, exists } from '@tauri-apps/plugin-fs';
+import { open, save } from '@tauri-apps/plugin-dialog';
 import "./App.css";
 
 function App() {
@@ -36,6 +38,14 @@ function App() {
   const [windowTitle, setWindowTitle] = useState("主窗口");
   const [windowSize, setWindowSize] = useState("1200x800");
   const [isSecondaryVisible, setIsSecondaryVisible] = useState(false);
+
+  // 文件系统相关状态
+  const [fileContent, setFileContent] = useState("");
+  const [currentFile, setCurrentFile] = useState(null);
+  const [directoryEntries, setDirectoryEntries] = useState([]);
+  const [currentDirectory, setCurrentDirectory] = useState(null);
+  const [fileExists, setFileExists] = useState(null);
+  const [filePathToCheck, setFilePathToCheck] = useState("");
 
   async function greet() {
     // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -278,6 +288,202 @@ function App() {
     } catch (err) {
       console.error("居中窗口失败:", err);
       alert(`居中窗口失败: ${err}`);
+    }
+  }
+
+  // ========== 文件系统操作函数 ==========
+
+  // 打开文件对话框并读取文件
+  async function handleOpenFile() {
+    try {
+      console.log("打开文件对话框...");
+      const selected = await open({
+        multiple: false,
+        filters: [
+          { name: '文本文件', extensions: ['txt', 'md'] },
+          { name: '所有文件', extensions: ['*'] }
+        ]
+      });
+
+      if (selected) {
+        console.log("选择的文件:", selected);
+        const content = await readTextFile(selected);
+        setFileContent(content);
+        setCurrentFile(selected);
+        console.log("文件读取成功");
+      } else {
+        console.log("用户取消了文件选择");
+      }
+    } catch (error) {
+      console.error("打开文件失败:", error);
+      const errorMsg = error?.message || error?.toString() || String(error) || '未知错误';
+      alert('打开文件失败: ' + errorMsg);
+    }
+  }
+
+  // 保存文件
+  async function handleSaveFile() {
+    try {
+      if (currentFile) {
+        // 保存到当前文件
+        console.log("保存到当前文件:", currentFile);
+        await writeTextFile(currentFile, fileContent);
+        console.log("文件保存成功");
+        alert('文件保存成功！');
+      } else {
+        // 另存为
+        await handleSaveAs();
+      }
+    } catch (error) {
+      console.error("保存文件失败:", error);
+      const errorMsg = error?.message || error?.toString() || String(error) || '未知错误';
+      alert('保存文件失败: ' + errorMsg);
+    }
+  }
+
+  // 另存为
+  async function handleSaveAs() {
+    try {
+      console.log("打开保存文件对话框...");
+      const path = await save({
+        defaultPath: 'untitled.txt',
+        filters: [
+          { name: '文本文件', extensions: ['txt'] }
+        ]
+      });
+
+      if (path) {
+        console.log("保存路径:", path);
+        try {
+          await writeTextFile(path, fileContent);
+          setCurrentFile(path);
+          console.log("文件另存为成功");
+          alert('文件保存成功！');
+        } catch (writeError) {
+          console.error("写入文件失败:", writeError);
+          const writeErrorMsg = writeError?.message || writeError?.toString() || String(writeError) || '未知错误';
+          alert('文件保存失败: ' + writeErrorMsg + '\n\n可能的原因：\n- 没有写入权限\n- 路径无效\n- 磁盘空间不足');
+          throw writeError;
+        }
+      } else {
+        console.log("用户取消了保存");
+      }
+    } catch (error) {
+      console.error("另存为失败:", error);
+      console.error("错误详情:", {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack,
+        error: error
+      });
+      
+      // 更详细的错误信息处理
+      let errorMsg = '未知错误';
+      try {
+        if (error) {
+          if (error.message) {
+            errorMsg = error.message;
+          } else if (typeof error === 'string') {
+            errorMsg = error;
+          } else if (error.toString && typeof error.toString === 'function') {
+            const str = error.toString();
+            if (str !== '[object Object]') {
+              errorMsg = str;
+            } else {
+              errorMsg = JSON.stringify(error);
+            }
+          } else {
+            errorMsg = String(error);
+          }
+        }
+      } catch (e) {
+        errorMsg = '无法解析错误信息';
+      }
+      
+      alert('另存为失败: ' + errorMsg + '\n\n可能的原因：\n- 对话框被取消\n- 没有保存权限\n- 路径无效');
+    }
+  }
+
+  // 选择目录并读取目录内容
+  async function handleSelectDirectory() {
+    try {
+      console.log("打开目录选择对话框...");
+      const selected = await open({
+        multiple: false,
+        directory: true
+      });
+
+      if (selected) {
+        console.log("选择的目录:", selected);
+        setCurrentDirectory(selected);
+        
+        // 读取目录内容
+        const entries = await readDir(selected);
+        console.log("目录内容:", entries);
+        setDirectoryEntries(entries);
+      } else {
+        console.log("用户取消了目录选择");
+      }
+    } catch (error) {
+      console.error("选择目录失败:", error);
+      const errorMsg = error?.message || error?.toString() || String(error) || '未知错误';
+      alert('选择目录失败: ' + errorMsg);
+    }
+  }
+
+  // 检查文件是否存在
+  async function handleCheckFileExists() {
+    try {
+      if (!filePathToCheck.trim()) {
+        alert('请输入文件路径');
+        return;
+      }
+
+      console.log("检查文件是否存在:", filePathToCheck);
+      
+      // 尝试检查文件是否存在
+      const existsResult = await exists(filePathToCheck.trim());
+      setFileExists(existsResult);
+      
+      if (existsResult) {
+        console.log("文件存在");
+      } else {
+        console.log("文件不存在");
+      }
+    } catch (error) {
+      console.error("检查文件失败:", error);
+      console.error("错误详情:", {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack,
+        error: error
+      });
+      
+      // 更详细的错误信息处理
+      let errorMsg = '未知错误';
+      try {
+        if (error) {
+          if (error.message) {
+            errorMsg = error.message;
+          } else if (typeof error === 'string') {
+            errorMsg = error;
+          } else if (error.toString && typeof error.toString === 'function') {
+            const str = error.toString();
+            if (str !== '[object Object]') {
+              errorMsg = str;
+            } else {
+              errorMsg = JSON.stringify(error);
+            }
+          } else {
+            errorMsg = String(error);
+          }
+        }
+      } catch (e) {
+        errorMsg = '无法解析错误信息';
+      }
+      
+      alert('检查文件失败: ' + errorMsg + '\n\n提示：请确保路径格式正确，可以使用文件对话框选择文件。');
+      setFileExists(null);
     }
   }
 
@@ -535,6 +741,113 @@ function App() {
         <p style={{ marginTop: "1rem", fontSize: "0.9em", color: "#666" }}>
           当前窗口大小：{windowSize}
         </p>
+      </div>
+
+      {/* ========== 文件系统操作 ========== */}
+      <div style={{ marginTop: "2rem", padding: "1.5rem", backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
+        <h2 style={{ marginTop: 0, marginBottom: "1rem" }}>📁 文件系统操作</h2>
+
+        {/* 文件读取和写入 */}
+        <div style={{ marginBottom: "2rem" }}>
+          <h3 style={{ marginBottom: "0.5rem" }}>文件操作</h3>
+          <div className="row" style={{ marginBottom: "1rem" }}>
+            <button type="button" onClick={handleOpenFile}>
+              打开文件
+            </button>
+            <button type="button" onClick={handleSaveFile}>
+              保存文件
+            </button>
+            <button type="button" onClick={handleSaveAs}>
+              另存为
+            </button>
+          </div>
+          
+          {currentFile && (
+            <p style={{ fontSize: "0.9em", color: "#666", marginBottom: "0.5rem" }}>
+              当前文件: {currentFile}
+            </p>
+          )}
+          
+          <textarea
+            value={fileContent}
+            onChange={(e) => setFileContent(e.target.value)}
+            placeholder="文件内容将显示在这里..."
+            style={{
+              width: "100%",
+              height: "200px",
+              padding: "0.5rem",
+              fontSize: "0.9em",
+              fontFamily: "monospace",
+              border: "1px solid #ddd",
+              borderRadius: "4px",
+              resize: "vertical"
+            }}
+          />
+        </div>
+
+        {/* 目录列表 */}
+        <div style={{ marginBottom: "2rem" }}>
+          <h3 style={{ marginBottom: "0.5rem" }}>目录操作</h3>
+          <div className="row" style={{ marginBottom: "1rem" }}>
+            <button type="button" onClick={handleSelectDirectory}>
+              选择目录
+            </button>
+          </div>
+          
+          {currentDirectory && (
+            <p style={{ fontSize: "0.9em", color: "#666", marginBottom: "0.5rem" }}>
+              当前目录: {currentDirectory}
+            </p>
+          )}
+          
+          {directoryEntries.length > 0 && (
+            <div style={{
+              backgroundColor: "white",
+              padding: "1rem",
+              borderRadius: "4px",
+              maxHeight: "200px",
+              overflowY: "auto",
+              border: "1px solid #ddd"
+            }}>
+              <h4 style={{ marginTop: 0, marginBottom: "0.5rem", fontSize: "0.9em" }}>目录内容:</h4>
+              <ul style={{ margin: 0, paddingLeft: "1.5rem" }}>
+                {directoryEntries.map((entry, index) => (
+                  <li key={index} style={{ marginBottom: "0.25rem" }}>
+                    {entry.isDirectory ? "📁" : "📄"} {entry.name}
+                    {entry.isDirectory && " (目录)"}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* 文件存在性检查 */}
+        <div>
+          <h3 style={{ marginBottom: "0.5rem" }}>文件存在性检查</h3>
+          <div className="row" style={{ marginBottom: "1rem" }}>
+            <input
+              type="text"
+              value={filePathToCheck}
+              onChange={(e) => setFilePathToCheck(e.target.value)}
+              placeholder="输入文件路径"
+              style={{ minWidth: "300px", padding: "0.5rem" }}
+            />
+            <button type="button" onClick={handleCheckFileExists}>
+              检查文件
+            </button>
+          </div>
+          
+          {fileExists !== null && (
+            <p style={{
+              fontSize: "0.9em",
+              color: fileExists ? "#28a745" : "#dc3545",
+              fontWeight: "bold"
+            }}>
+              {fileExists ? "✓ 文件存在" : "✗ 文件不存在"}
+            </p>
+          )}
+        </div>
       </div>
     </main>
   );

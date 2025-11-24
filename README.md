@@ -49,8 +49,8 @@ Tauri/
 - ✅ 第3课：前端与后端的通信机制（IPC）（已完成）
 
 ### 第二阶段：核心功能（第4-7课）
-- 📖 第4课：窗口管理与自定义（讲义已就绪）
-- 第5课：文件系统操作
+- ✅ 第4课：窗口管理与自定义（已完成）
+- 📖 第5课：文件系统操作（讲义已就绪）
 - 第6课：系统通知与对话框
 - 第7课：系统托盘与菜单
 
@@ -123,6 +123,9 @@ Tauri/
 - `lesson-01-tauri-introduction.md` - 第1课
 - `syntax-guide-01.md` - 第1课语法详解（零基础入门指南）
 - `lesson-02-project-structure.md` - 第2课
+- `lesson-03-ipc-communication.md` - 第3课
+- `lesson-04-window-management.md` - 第4课
+- `lesson-05-file-system.md` - 第5课
 - ...
 
 ### 查看作业要求
@@ -130,6 +133,9 @@ Tauri/
 作业文档存放在 `docs/homework/` 目录下：
 - `homework-01.md` - 第1课作业
 - `homework-02.md` - 第2课作业
+- `homework-03.md` - 第3课作业
+- `homework-04.md` - 第4课作业
+- `homework-05.md` - 第5课作业
 - ...
 
 ### 运行实践项目
