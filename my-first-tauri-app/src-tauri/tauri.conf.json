@@ -19,7 +19,8 @@
         "minWidth": 500,
         "minHeight": 400,
         "center": true,
-        "closable": true
+        "closable": true,
+        "focus": false
       },
       {
         "label": "secondary",

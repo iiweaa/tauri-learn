@@ -102,6 +102,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())      // 注册文件系统插件
         .plugin(tauri_plugin_dialog::init())  // 注册对话框插件
+        .plugin(tauri_plugin_notification::init())  // 注册通知插件
         .invoke_handler(tauri::generate_handler![greet, calculate, get_timestamp, get_system_info, process_numbers, safe_divide])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

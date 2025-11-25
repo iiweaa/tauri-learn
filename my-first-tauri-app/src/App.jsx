@@ -2,9 +2,33 @@ import { useState, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, Window, LogicalSize } from "@tauri-apps/api/window";
-import { readTextFile, writeTextFile, readDir, exists } from '@tauri-apps/plugin-fs';
-import { open, save } from '@tauri-apps/plugin-dialog';
+import { readTextFile, writeTextFile, readDir, exists, remove } from '@tauri-apps/plugin-fs';
+import { open, save, message, ask } from '@tauri-apps/plugin-dialog';
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import "./App.css";
+
+// 检查是否在Tauri环境中运行
+function isTauri() {
+  // 检查多种方式来确定是否在Tauri环境中
+  if (typeof window === 'undefined') return false;
+  
+  // 方式1：检查 window.__TAURI__
+  if (window.__TAURI__ !== undefined) return true;
+  
+  // 方式2：检查是否有Tauri API可用（通过尝试访问Tauri API）
+  try {
+    // 如果能够访问 @tauri-apps/api，说明在Tauri环境中
+    // 这里我们通过检查是否有invoke函数来判断
+    if (typeof invoke !== 'undefined') return true;
+  } catch (e) {
+    // 忽略错误
+  }
+  
+  // 方式3：检查用户代理（Tauri应用通常有特定的user agent）
+  if (navigator.userAgent.includes('Tauri')) return true;
+  
+  return false;
+}
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
@@ -46,6 +70,10 @@ function App() {
   const [currentDirectory, setCurrentDirectory] = useState(null);
   const [fileExists, setFileExists] = useState(null);
   const [filePathToCheck, setFilePathToCheck] = useState("");
+
+  // 通知相关状态
+  const [notificationTitle, setNotificationTitle] = useState('系统通知');
+  const [notificationBody, setNotificationBody] = useState('这是一条测试通知消息！');
 
   async function greet() {
     // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -321,7 +349,7 @@ function App() {
     }
   }
 
-  // 保存文件
+  // 保存文件（任务6：结合通知）
   async function handleSaveFile() {
     try {
       if (currentFile) {
@@ -329,6 +357,8 @@ function App() {
         console.log("保存到当前文件:", currentFile);
         await writeTextFile(currentFile, fileContent);
         console.log("文件保存成功");
+        // 任务6：成功后发送通知
+        await sendSuccessNotification(`文件已保存：${currentFile}`);
         alert('文件保存成功！');
       } else {
         // 另存为
@@ -337,6 +367,8 @@ function App() {
     } catch (error) {
       console.error("保存文件失败:", error);
       const errorMsg = error?.message || error?.toString() || String(error) || '未知错误';
+      // 任务6：失败后发送错误通知
+      await sendErrorNotification(`文件保存失败：${errorMsg}`);
       alert('保存文件失败: ' + errorMsg);
     }
   }
@@ -358,10 +390,14 @@ function App() {
           await writeTextFile(path, fileContent);
           setCurrentFile(path);
           console.log("文件另存为成功");
+          // 任务6：成功后发送通知
+          await sendSuccessNotification(`文件已另存为：${path}`);
           alert('文件保存成功！');
         } catch (writeError) {
           console.error("写入文件失败:", writeError);
           const writeErrorMsg = writeError?.message || writeError?.toString() || String(writeError) || '未知错误';
+          // 任务6：失败后发送错误通知
+          await sendErrorNotification(`文件另存为失败：${writeErrorMsg}`);
           alert('文件保存失败: ' + writeErrorMsg + '\n\n可能的原因：\n- 没有写入权限\n- 路径无效\n- 磁盘空间不足');
           throw writeError;
         }
@@ -487,9 +523,260 @@ function App() {
     }
   }
 
+  // 通知相关函数
+  // 检查通知权限
+  async function checkNotificationPermission() {
+    try {
+      const granted = await isPermissionGranted();
+      if (!granted) {
+        const permission = await requestPermission();
+        return permission === 'granted';
+      }
+      return granted;
+    } catch (error) {
+      console.error('检查通知权限失败:', error);
+      return false;
+    }
+  }
+
+  // 任务7：自定义通知样式 - 辅助函数
+  // 发送成功通知
+  async function sendSuccessNotification(message) {
+    try {
+      const granted = await checkNotificationPermission();
+      if (granted) {
+        await sendNotification({
+          title: '✅ 操作成功',
+          body: message,
+        });
+        console.log('成功通知已发送:', message);
+      } else {
+        console.warn('通知权限未授予，无法发送成功通知');
+        alert('通知权限未授予，请先授予通知权限');
+      }
+    } catch (error) {
+      console.error('发送成功通知失败:', error);
+      alert('发送成功通知失败: ' + (error.message || String(error)));
+    }
+  }
+
+  // 发送错误通知
+  async function sendErrorNotification(message) {
+    try {
+      const granted = await checkNotificationPermission();
+      if (granted) {
+        await sendNotification({
+          title: '❌ 操作失败',
+          body: message,
+        });
+        console.log('错误通知已发送:', message);
+      } else {
+        console.warn('通知权限未授予，无法发送错误通知');
+        alert('通知权限未授予，请先授予通知权限');
+      }
+    } catch (error) {
+      console.error('发送错误通知失败:', error);
+      alert('发送错误通知失败: ' + (error.message || String(error)));
+    }
+  }
+
+  // 发送警告通知
+  async function sendWarningNotification(message) {
+    try {
+      const granted = await checkNotificationPermission();
+      if (granted) {
+        await sendNotification({
+          title: '⚠️ 警告',
+          body: message,
+        });
+        console.log('警告通知已发送:', message);
+      } else {
+        console.warn('通知权限未授予，无法发送警告通知');
+        alert('通知权限未授予，请先授予通知权限');
+      }
+    } catch (error) {
+      console.error('发送警告通知失败:', error);
+      alert('发送警告通知失败: ' + (error.message || String(error)));
+    }
+  }
+
+  // 发送通知
+  async function handleSendNotification() {
+    try {
+      const granted = await checkNotificationPermission();
+      if (granted) {
+        await sendNotification({
+          title: notificationTitle || '系统通知',
+          body: notificationBody || '这是一条测试通知消息！',
+        });
+        alert('通知已发送！');
+      } else {
+        alert('用户未授予通知权限');
+      }
+    } catch (error) {
+      console.error('发送通知失败:', error);
+      alert('发送通知失败: ' + (error.message || String(error)));
+    }
+  }
+
+  // 对话框相关函数
+  // 显示信息对话框
+  async function handleShowInfoDialog() {
+    try {
+      await message('ℹ️ 信息对话框\n\n这是一个信息对话框，用于显示一般信息。\n\n类型：info（信息）', {
+        title: '信息对话框',
+        kind: 'info',
+      });
+    } catch (error) {
+      console.error('显示信息对话框失败:', error);
+      alert('显示信息对话框失败: ' + (error.message || String(error)));
+    }
+  }
+
+  // 显示警告对话框
+  async function handleShowWarningDialog() {
+    try {
+      await message('⚠️ 警告对话框\n\n这是一个警告对话框，用于显示警告信息。\n\n类型：warning（警告）', {
+        title: '警告对话框',
+        kind: 'warning',
+      });
+    } catch (error) {
+      console.error('显示警告对话框失败:', error);
+      alert('显示警告对话框失败: ' + (error.message || String(error)));
+    }
+  }
+
+  // 显示错误对话框
+  async function handleShowErrorDialog() {
+    try {
+      await message('❌ 错误对话框\n\n这是一个错误对话框，用于显示错误信息。\n\n类型：error（错误）', {
+        title: '错误对话框',
+        kind: 'error',
+      });
+    } catch (error) {
+      console.error('显示错误对话框失败:', error);
+      alert('显示错误对话框失败: ' + (error.message || String(error)));
+    }
+  }
+
+  // 显示确认对话框
+  async function handleShowConfirmDialog() {
+    try {
+      const confirmed = await ask('确定要执行此操作吗？', {
+        title: '确认对话框',
+        kind: 'warning',
+      });
+      
+      if (confirmed) {
+        await message('用户确认了操作', {
+          title: '提示',
+          kind: 'info',
+        });
+      } else {
+        await message('用户取消了操作', {
+          title: '提示',
+          kind: 'info',
+        });
+      }
+    } catch (error) {
+      console.error('显示确认对话框失败:', error);
+      alert('显示确认对话框失败: ' + (error.message || String(error)));
+    }
+  }
+
+  // 任务6：删除文件（带确认对话框）
+  async function handleDeleteFile() {
+    if (!currentFile) {
+      await message('请先选择一个文件', {
+        title: '提示',
+        kind: 'warning',
+      });
+      return;
+    }
+
+    try {
+      // 显示确认对话框
+      const confirmed = await ask(`确定要删除文件吗？\n\n文件路径：${currentFile}`, {
+        title: '删除文件确认',
+        kind: 'warning',
+      });
+
+      if (confirmed) {
+        // 执行删除操作
+        await remove(currentFile);
+        console.log("文件删除成功:", currentFile);
+        
+        // 清空文件内容
+        setFileContent("");
+        setCurrentFile(null);
+        
+        // 发送成功通知
+        await sendSuccessNotification(`文件已删除：${currentFile}`);
+        
+        await message('文件删除成功', {
+          title: '提示',
+          kind: 'info',
+        });
+      } else {
+        // 用户取消删除
+        await message('已取消删除操作', {
+          title: '提示',
+          kind: 'info',
+        });
+      }
+    } catch (error) {
+      console.error("删除文件失败:", error);
+      const errorMsg = error?.message || error?.toString() || String(error) || '未知错误';
+      // 发送错误通知
+      await sendErrorNotification(`文件删除失败：${errorMsg}`);
+      alert('删除文件失败: ' + errorMsg);
+    }
+  }
+
+  // 任务8：对话框链式操作
+  async function handleChainDialogs() {
+    try {
+      // 第一步：确认
+      const confirmed = await ask('确定要继续执行链式操作吗？', {
+        title: '第一步：确认',
+        kind: 'warning',
+      });
+
+      if (confirmed) {
+        // 第二步：信息对话框
+        await message('操作进行中，请稍候...', {
+          title: '第二步：信息',
+          kind: 'info',
+        });
+
+        // 模拟一些操作（延迟）
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // 第三步：发送通知
+        await sendSuccessNotification('所有链式操作已完成！');
+        
+        // 第四步：最终确认
+        await message('✅ 链式操作完成\n\n所有步骤已成功执行：\n1. 确认操作\n2. 显示信息\n3. 发送通知\n4. 完成提示', {
+          title: '第三步：完成',
+          kind: 'info',
+        });
+      } else {
+        await message('已取消链式操作', {
+          title: '提示',
+          kind: 'info',
+        });
+      }
+    } catch (error) {
+      console.error('链式对话框操作失败:', error);
+      await sendErrorNotification(`链式操作失败：${error.message || String(error)}`);
+      alert('链式操作失败: ' + (error.message || String(error)));
+    }
+  }
+
   // 监听窗口事件
   useEffect(() => {
     const setupWindowListeners = async () => {
+      // 尝试设置窗口监听器，如果失败说明不在Tauri环境中
       try {
         const mainWindow = getCurrentWindow();
         
@@ -760,6 +1047,11 @@ function App() {
             <button type="button" onClick={handleSaveAs}>
               另存为
             </button>
+            {currentFile && (
+              <button type="button" onClick={handleDeleteFile} style={{ backgroundColor: "#dc3545", color: "white" }}>
+                删除文件
+              </button>
+            )}
           </div>
           
           {currentFile && (
@@ -847,6 +1139,76 @@ function App() {
               {fileExists ? "✓ 文件存在" : "✗ 文件不存在"}
             </p>
           )}
+        </div>
+
+        {/* 系统通知功能区域 */}
+        <div>
+          <h3 style={{ marginBottom: "0.5rem" }}>系统通知</h3>
+          <div style={{ marginBottom: "1rem" }}>
+            <div className="row" style={{ marginBottom: "0.5rem" }}>
+              <label style={{ minWidth: "100px" }}>通知标题：</label>
+              <input
+                type="text"
+                value={notificationTitle}
+                onChange={(e) => setNotificationTitle(e.target.value)}
+                placeholder="输入通知标题"
+                style={{ flex: 1, padding: "0.5rem" }}
+              />
+            </div>
+            <div className="row" style={{ marginBottom: "0.5rem" }}>
+              <label style={{ minWidth: "100px" }}>通知内容：</label>
+              <textarea
+                value={notificationBody}
+                onChange={(e) => setNotificationBody(e.target.value)}
+                placeholder="输入通知内容"
+                rows={3}
+                style={{ flex: 1, padding: "0.5rem", fontFamily: "inherit" }}
+              />
+            </div>
+            <button type="button" onClick={handleSendNotification}>
+              发送通知
+            </button>
+          </div>
+        </div>
+
+        {/* 消息对话框功能区域 */}
+        <div>
+          <h3 style={{ marginBottom: "0.5rem" }}>消息对话框</h3>
+          <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+            <button type="button" onClick={handleShowInfoDialog}>
+              显示信息对话框
+            </button>
+            <button type="button" onClick={handleShowWarningDialog}>
+              显示警告对话框
+            </button>
+            <button type="button" onClick={handleShowErrorDialog}>
+              显示错误对话框
+            </button>
+            <button type="button" onClick={handleShowConfirmDialog}>
+              显示确认对话框
+            </button>
+          </div>
+          <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+            <button type="button" onClick={handleChainDialogs} style={{ backgroundColor: "#28a745", color: "white" }}>
+              对话框链式操作（选做任务8）
+            </button>
+          </div>
+        </div>
+
+        {/* 任务7：自定义通知样式测试 */}
+        <div>
+          <h3 style={{ marginBottom: "0.5rem" }}>自定义通知样式（选做任务7）</h3>
+          <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+            <button type="button" onClick={async () => await sendSuccessNotification('这是一个成功通知示例')} style={{ backgroundColor: "#28a745", color: "white" }}>
+              发送成功通知
+            </button>
+            <button type="button" onClick={async () => await sendErrorNotification('这是一个错误通知示例')} style={{ backgroundColor: "#dc3545", color: "white" }}>
+              发送错误通知
+            </button>
+            <button type="button" onClick={async () => await sendWarningNotification('这是一个警告通知示例')} style={{ backgroundColor: "#ffc107", color: "black" }}>
+              发送警告通知
+            </button>
+          </div>
         </div>
       </div>
     </main>
