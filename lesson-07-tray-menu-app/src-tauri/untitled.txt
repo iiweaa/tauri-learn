@@ -1,0 +1,2 @@
+xfreerdp /v:192.168.31.40 /u:Administrator /p:123456 /size:2840x2160 /bpp:16
+请求11111111
